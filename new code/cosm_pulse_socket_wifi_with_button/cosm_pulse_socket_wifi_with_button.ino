@@ -123,6 +123,7 @@ void loop() {
     lastMillis = millis();
     sendDataToCosm(BPM);
     Serial.println("NOW!");
+    Serial.println(BPM);
   }
   if (Serial.available() > 0) {
     wifly.write(Serial.read());
