@@ -2,12 +2,9 @@
 #include <Ethernet.h>
 #include <HttpClient.h>
 #include <Cosm.h>
-
-//THIS IS FOR WIFI CONNECTION
 #include <WiFlyHQ.h>
 #include <SoftwareSerial.h>
-//WIFI
-//Setting the TX & TRX pins, in this case (8,9) 
+
 SoftwareSerial wifiSerial(8,9);
 WiFly wifly;
 
@@ -15,9 +12,13 @@ WiFly wifly;
 const char mySSID[] = "SBG658060"; //"internetz"; 
 const char myPassword[] = "SBG6580E58E60"; //"1nt3rn3tz"; 
 char site[] = "api.cosm.com";
+// Your Cosm key to let you upload data
+char feedId[] = "104810"; //FEED ID
+char cosmKey[] = "ewTCG0qri8i6jXsXxwXxnrAZpnKSAKxHL0tnbndNeEpPdz0g"; //API KEY
+char sensorId[] = "Quincy"; //This should not contain a space ' ' char
 
 //  VARIABLES
-int pulsePin = 0;                 // Pulse Sensor purple wire connected to analog pin 0
+int pulsePin = A0;                 // Pulse Sensor purple wire connected to analog pin 0
 int blinkPin = 13;                // pin to blink led at each beat
 int fadePin = 5;                  // pin to do fancy classy fading blink at each beat
 int fadeRate = 0;                 // used to fade LED on with PWM on fadePin
@@ -26,12 +27,8 @@ int averageBPM = 0;
 int averageNumber = 10;
 long previousUploadTime = 0;
 long uploadInterval = 100;
-
-unsigned long currentMillis;
-unsigned long lastMillis;
-int divideBy;
-float BPMPlus;
-float BPMAverage;
+unsigned long lastMillis = 0;
+unsigned long currentMillis = 0;
 
 // these variables are volatile because they are used during the interrupt service routine!
 volatile int BPM;                   // used to hold the pulse rate
@@ -42,20 +39,11 @@ volatile boolean QS = false;        // becomes true when Arduoino finds a beat.
 
 
 
-// Your Cosm key to let you upload data
-char feedId[] = "104810"; //FEED ID
-char cosmKey[] = "ewTCG0qri8i6jXsXxwXxnrAZpnKSAKxHL0tnbndNeEpPdz0g"; //API KEY
-char sensorId[] = "Quincy"; //This should not contain a space ' ' char
 
 void setup() {
-  divideBy = 0;
-  BPMPlus = 0;
-  BPMAverage = 0;
-  // put your setup code here, to run once:
   pinMode(blinkPin,OUTPUT);         // pin that will blink to your heartbeat!
   pinMode(fadePin,OUTPUT);          // pin that will fade to your heartbeat!
   Serial.begin(115200);             // we agree to talk fast!
-  
 
   Serial.println("Starting PULSE upload to Cosm...");
   Serial.println();
@@ -63,113 +51,94 @@ void setup() {
   char buf[32];
   
   Serial.println("Starting");
-    Serial.print("Free memory: ");
-    Serial.println(wifly.getFreeMemory(),DEC);
+  Serial.print("Free memory: ");
+  Serial.println(wifly.getFreeMemory(),DEC);
 
-    wifiSerial.begin(9600);
-    if (!wifly.begin(&wifiSerial, &Serial)) {
-        Serial.println("Failed to start wifly");
+  wifiSerial.begin(9600);
+  if (!wifly.begin(&wifiSerial, &Serial)) {
+    Serial.println("Failed to start wifly");
+  }
+
+  /* Join wifi network if not already associated */
+  if (!wifly.isAssociated()) {
+  /* Setup the WiFly to connect to a wifi network */
+    Serial.println("Joining network");
+    wifly.setSSID(mySSID);
+    wifly.setPassphrase(myPassword);
+    wifly.enableDHCP();
+    if (wifly.join()) {
+      Serial.println("Joined wifi network");
+    } 
+    else {
+      Serial.println("Failed to join wifi network");    
     }
+    } 
+  else {
+    Serial.println("Already joined network");
+  }
 
-    /* Join wifi network if not already associated */
-    if (!wifly.isAssociated()) {
-	/* Setup the WiFly to connect to a wifi network */
-	Serial.println("Joining network");
-	wifly.setSSID(mySSID);
-	wifly.setPassphrase(myPassword);
-	wifly.enableDHCP();
+  Serial.print("MAC: ");
+  Serial.println(wifly.getMAC(buf, sizeof(buf)));
+  Serial.print("IP: ");
+  Serial.println(wifly.getIP(buf, sizeof(buf)));
+  Serial.print("Netmask: ");
+  Serial.println(wifly.getNetmask(buf, sizeof(buf)));
+  Serial.print("Gateway: ");
+  Serial.println(wifly.getGateway(buf, sizeof(buf)));
+  wifly.setDeviceID("Wifly-WebClient");
+  Serial.print("DeviceID: ");
+  Serial.println(wifly.getDeviceID(buf, sizeof(buf)));
 
-	if (wifly.join()) {
-	    Serial.println("Joined wifi network");
-	} else {
-	    Serial.println("Failed to join wifi network");
-	    
-	}
-    } else {
-        Serial.println("Already joined network");
-    }
+  if (wifly.isConnected()) {
+    Serial.println("Old connection active. Closing");
+    wifly.close();
+  }
 
-    Serial.print("MAC: ");
-    Serial.println(wifly.getMAC(buf, sizeof(buf)));
-    Serial.print("IP: ");
-    Serial.println(wifly.getIP(buf, sizeof(buf)));
-    Serial.print("Netmask: ");
-    Serial.println(wifly.getNetmask(buf, sizeof(buf)));
-    Serial.print("Gateway: ");
-    Serial.println(wifly.getGateway(buf, sizeof(buf)));
+  if (wifly.open(site, 8081)) {
+    Serial.print("Connected to ");
+    Serial.println(site);
 
-    wifly.setDeviceID("Wifly-WebClient");
-    Serial.print("DeviceID: ");
-    Serial.println(wifly.getDeviceID(buf, sizeof(buf)));
-
-    if (wifly.isConnected()) {
-        Serial.println("Old connection active. Closing");
-	wifly.close();
-    }
-
-    if (wifly.open(site, 8081)) {
-        Serial.print("Connected to ");
-	Serial.println(site);
-
-	/* Send the request */
-//	wifly.println("GET / HTTP/1.0");
-//	wifly.println();
-    } else {
-        Serial.println("Failed to connect");
-    }
-    interruptSetup();                 // sets up to read Pulse Sensor signal every 2mS 
+  } 
+  else {
+    Serial.println("Failed to connect");
+  }
+  interruptSetup();                 // sets up to read Pulse Sensor signal every 2mS 
+  Serial.println("Set up Complete"); 
 }
+
+
+
 
 void loop() {
   currentMillis = millis();
-  //sendDataToProcessing('S', Signal);     // send Processing the raw Pulse Sensor data
-  if(QS == true){
-    BPMPlus += BPM;
-    divideBy++;
-    BPMAverage = BPMPlus/divideBy;
-    Serial.print(divideBy);
-    Serial.print(": ");
+  if (QS == true){                       // Quantified Self flag is true when arduino finds a heartbeat
+    fadeRate = 255;                  // Set 'fadeRate' Variable to 255 to fade LED with pulse
     Serial.println(BPM);
-    QS = false; // reset the Quantified Self flag for next time 
-    if (currentMillis - lastMillis > 1000){                       // Quantified Self flag is true when arduino finds a heartbeat
-      fadeRate = 255;                  // Set 'fadeRate' Variable to 255 to fade LED with pulse
-      //sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
-      //sendDataToProcessing('Q',IBI);   // send time between beats with a 'Q' prefix
-       sendDataToCosm(BPMAverage);             //send data to cosm sockets using arduino ethernet/shield
-      lastMillis = currentMillis;
-      Serial.print("Average: ");
-      Serial.println(BPMAverage);
-      divideBy = 0;
-      BPMPlus = 0;
-    }
+    sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
+    QS = false;                           // reset the Quantified Self flag for next time    
   }
-
-  //ledFadeToBeat(); //This will fade the led to the beat if you have one plugged into a PWM pin (definded above)
-  
-  // from the server, read them and print them:
-  
-//  if (wifly.available() > 0) {
-//	char ch = wifly.read();
-//	Serial.write(ch);
-//	if (ch == '\n') {
-//	    /* add a carriage return */ 
-//	    Serial.write('\r');
-//	}
-//    }
-
-    if (Serial.available() > 0) {
-	wifly.write(Serial.read());
-    }
+  //if 1 second has passed since the last data was sent
+  if(currentMillis - lastMillis >= 1000){
+    //record the current time and set that to be the "last data sent time"
+    lastMillis = millis();
+    sendDataToCosm(BPM);
+    Serial.println("NOW!");
+  }
+  if (Serial.available() > 0) {
+    wifly.write(Serial.read());
+  }
 
   delay(20);                             //  take a break
 }
+
+
+
 
 void ledFadeToBeat(){
   fadeRate -= 15;                         //  set LED fade value
   fadeRate = constrain(fadeRate,0,255);   //  keep LED fade value from going into negative numbers!
   analogWrite(fadePin,fadeRate);          //  fade LED
 }
-
 
 void sendDataToProcessing(char symbol, int data ){
   Serial.print(symbol);                // symbol prefix tells Processing what type of data is coming
@@ -191,9 +160,14 @@ void sendDataToCosm(int data){
 }
 
 
+
+
+
+
+
+
 /*
->> Pulse Sensor Amped 1.1 <<
- This code is for Pulse Sensor Amped by Joel Murphy and Yury Gitman
+ Quincy Bock and Maurico Sanchez adaptation of Pulse Sensor Amped by Joel Murphy and Yury Gitman
  www.pulsesensor.com 
  >>> Pulse Sensor purple wire goes to Analog Pin 0 <<<
  Pulse Sensor sample aquisition and processing happens in the background via Timer 2 interrupt. 2mS sample rate.
@@ -220,4 +194,5 @@ void sendDataToCosm(int data){
  Fade LED pin moved to pin 5 (use of Timer2 disables PWM on pins 3 & 11).
  Tidied up inefficiencies since the last version. 
  */
+
 
