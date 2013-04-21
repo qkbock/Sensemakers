@@ -9,22 +9,31 @@ volatile boolean firstBeat = true;        // used to seed rate array so we start
 volatile boolean secondBeat = true;       // used to seed rate array so we startup with reasonable BPM
 
 
-void interruptSetup(){     
-  // Initializes Timer4 on LEONARDO to throw an interrupt every 2mS.
-  TCCR4A = 0x02;     // DISABLE PWM ON DIGITAL PINS 3 AND 11, AND GO INTO CTC MODE
-  TCCR4B = 0x06;     // DON'T FORCE COMPARE, 256 PRESCALER 
-  OCR4A = 0X7C;      // SET THE TOP OF THE COUNT TO 124 FOR 500Hz SAMPLE RATE
-  TIMSK4 = 0x02;     // ENABLE INTERRUPT ON MATCH BETWEEN TIMER4 AND OCR24
+void interruptSetupUNO(){     
+  // Initializes Timer2 to throw an interrupt every 2mS.
+  TCCR2A = 0x02;     // DISABLE PWM ON DIGITAL PINS 3 AND 11, AND GO INTO CTC MODE
+  TCCR2B = 0x06;     // DON'T FORCE COMPARE, 256 PRESCALER 
+  OCR2A = 0X7C;      // SET THE TOP OF THE COUNT TO 124 FOR 500Hz SAMPLE RATE
+  TIMSK2 = 0x02;     // ENABLE INTERRUPT ON MATCH BETWEEN TIMER2 AND OCR2A
   sei();             // MAKE SURE GLOBAL INTERRUPTS ARE ENABLED      
 } 
 
+void interruptSetupLEO(){     
+  // Initializes Timer2 to throw an interrupt every 2mS.
+  TCCR0A = 0x02;
+  TCCR0B = 0x04; 
+  OCR0A = 0x7C; 
+  TIMSK0 = 0x02; 
+  sei();             // MAKE SURE GLOBAL INTERRUPTS ARE ENABLED      
+} 
 
-// THIS IS THE TIMER 4 INTERRUPT SERVICE ROUTINE. 
-// Timer 4 makes sure that we take a reading every 2 miliseconds
-ISR(TIMER4_COMPA_vect){                         // triggered when Timer4 counts to 124
+// THIS IS THE TIMER 2 INTERRUPT SERVICE ROUTINE. 
+// Timer 2 makes sure that we take a reading every 2 miliseconds
+ISR(TIMER0_COMPA_vect){                         // triggered when Timer2 counts to 124
     cli();                                      // disable interrupts while we do this
     Signal = analogRead(pulsePin);              // read the Pulse Sensor 
     sampleCounter += 2;                         // keep track of the time in mS with this variable
+
     int N = sampleCounter - lastBeatTime;       // monitor the time since the last beat to avoid noise
 
 //  find the peak and trough of the pulse wave
@@ -59,7 +68,7 @@ if (N > 250){                                   // avoid high frequency noise
             }
           
     // keep a running total of the last 10 IBI values
-    word runningTotal = 0;                   // clear the runningTotal variable    
+    int runningTotal = 0;                   // clear the runningTotal variable    
 
     for(int i=0; i<=8; i++){                // shift data in the rate array
           rate[i] = rate[i+1];              // and drop the oldest IBI value 
@@ -95,4 +104,3 @@ if (N > 250){                                   // avoid high frequency noise
   
   sei();                                     // enable interrupts when youre done!
 }// end isr
-

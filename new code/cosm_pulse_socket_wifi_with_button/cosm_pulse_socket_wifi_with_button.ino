@@ -9,8 +9,8 @@ SoftwareSerial wifiSerial(8,9);
 WiFly wifly;
 
 /* Change these to match your WiFi network */
-const char mySSID[] = "SBG658060"; //"internetz"; 
-const char myPassword[] = "SBG6580E58E60"; //"1nt3rn3tz"; 
+const char mySSID[] = "internetz";  //"SBG658060"; 
+const char myPassword[] = "1nt3rn3tz"; //"SBG6580E58E60";  
 char site[] = "api.cosm.com";
 // Your Cosm key to let you upload data
 char feedId[] = "104810"; //FEED ID
@@ -18,7 +18,7 @@ char cosmKey[] = "ewTCG0qri8i6jXsXxwXxnrAZpnKSAKxHL0tnbndNeEpPdz0g"; //API KEY
 char sensorId[] = "Quincy"; //This should not contain a space ' ' char
 
 //  VARIABLES
-int pulsePin = A0;                 // Pulse Sensor purple wire connected to analog pin 0
+int pulsePin = 0;                 // Pulse Sensor purple wire connected to analog pin 0
 int blinkPin = 13;                // pin to blink led at each beat
 int fadePin = 5;                  // pin to do fancy classy fading blink at each beat
 int fadeRate = 0;                 // used to fade LED on with PWM on fadePin
@@ -27,8 +27,8 @@ int averageBPM = 0;
 int averageNumber = 10;
 long previousUploadTime = 0;
 long uploadInterval = 100;
-unsigned long lastMillis = 0;
-unsigned long currentMillis = 0;
+long lastMillis = 0;
+long currentMillis = 0;
 
 // these variables are volatile because they are used during the interrupt service routine!
 volatile int BPM;                   // used to hold the pulse rate
@@ -102,7 +102,7 @@ void setup() {
   else {
     Serial.println("Failed to connect");
   }
-  interruptSetup();                 // sets up to read Pulse Sensor signal every 2mS 
+  interruptSetupLEO();                 // sets up to read Pulse Sensor signal every 2mS 
   Serial.println("Set up Complete"); 
 }
 
@@ -110,26 +110,30 @@ void setup() {
 
 
 void loop() {
-  currentMillis = millis();
+  //currentMillis = millis();
+  //Serial.println(currentMillis);
+  //Serial.println(millis());
+    delay(20); 
   if (QS == true){                       // Quantified Self flag is true when arduino finds a heartbeat
     fadeRate = 255;                  // Set 'fadeRate' Variable to 255 to fade LED with pulse
     Serial.println(BPM);
-    sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
+    //sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
+    sendDataToCosm(BPM);
     QS = false;                           // reset the Quantified Self flag for next time    
   }
   //if 1 second has passed since the last data was sent
-  if(currentMillis - lastMillis >= 1000){
-    //record the current time and set that to be the "last data sent time"
-    lastMillis = millis();
-    sendDataToCosm(BPM);
-    Serial.println("NOW!");
-    Serial.println(BPM);
-  }
+//  if((currentMillis - lastMillis) >= 1000){
+//    //record the current time and set that to be the "last data sent time"
+//    lastMillis =  millis();
+//    sendDataToCosm(BPM);
+//    Serial.println("now!");
+//    Serial.println(BPM);
+//  }
   if (Serial.available() > 0) {
     wifly.write(Serial.read());
   }
 
-  delay(20);                             //  take a break
+                            //  take a break
 }
 
 

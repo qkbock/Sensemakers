@@ -12,8 +12,8 @@ SoftwareSerial wifiSerial(8,9);
 WiFly wifly;
 
 /* Change these to match your WiFi network */
-const char mySSID[] = "SBG658060"; //"internetz"; 
-const char myPassword[] = "SBG6580E58E60"; //"1nt3rn3tz"; 
+const char mySSID[] = "internetz"; //"SBG658060"; 
+const char myPassword[] = "1nt3rn3tz";  //"SBG6580E58E60"; 
 char site[] = "api.cosm.com";
 
 /*
@@ -152,17 +152,17 @@ void loop() {
   if (QS == true){                       // Quantified Self flag is true when arduino finds a heartbeat
     fadeRate = 255;                  // Set 'fadeRate' Variable to 255 to fade LED with pulse
     Serial.println(BPM);
-    sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
+    //sendDataToProcessing('B',BPM);   // send heart rate with a 'B' prefix
     //sendDataToProcessing('Q',IBI);   // send time between beats with a 'Q' prefix
-    // sendDataToCosm(BPM);             //send data to cosm sockets using arduino ethernet/shield
+    sendDataToCosm(BPM);             //send data to cosm sockets using arduino ethernet/shield
     QS = false;                      // reset the Quantified Self flag for next time    
   }
-  if(currentMillis - lastMillis >= 1000){
-    lastMillis = millis();
-    counter ++;
-    sendDataToCosm(BPM);
-    Serial.println("NOW!");
-  }
+//  if(currentMillis - lastMillis >= 1000){
+//    lastMillis = millis();
+//    counter ++;
+//    sendDataToCosm(BPM);
+//    Serial.println("NOW!");
+//  }
 
   //ledFadeToBeat(); //This will fade the led to the beat if you have one plugged into a PWM pin (definded above)
   
